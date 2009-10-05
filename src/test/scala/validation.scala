@@ -1,8 +1,16 @@
 import org.specs._
-
+    
+import scalaz.Scalaz._
+//import scalaz.Apply._
+import scalaz.Applicative._
+import scalaz._
+    
 
 object ValidationsAndForms extends Specification {
   case class Person(name : String, age : Int)
+  object Person {
+    val make = Function.curried(apply _)
+  }
   
   val validData = Map("name" -> "Nick", "age" -> "26")
   val emptyData = Map[String, String]()
@@ -10,12 +18,27 @@ object ValidationsAndForms extends Specification {
   
   val allBad = Map("age" -> "yes please")
 
-  "be interesting" in {
-    import scalaz.Scalaz._
-    import scalaz.Apply._
-//    import scalaz.Validation._
-    import scalaz._
+  "Given some validated values" in {
+    type Errors = List[(String, String)]
     
+    val name : Validation[Errors, String] = Success("Nick")
+    val emptyName = Failure(List(("name", "Required!")))
+        
+    val age = Success[List[(String, String)],Int](26)
+    val badAge = Failure(List(("age", "must be integer")))
+
+    val cons = Person.make
+    
+    val y = (cons <|: name) <*>: age
+    val x = age <*> (name |> cons)
+    val z : Validation[List[(String,String)], Person] = cons </> name <*> age
+    
+    y must be_==(Success(Person("Nick", 26)))
+    x must be_==(y)
+    println(y)
+  }
+  
+  "be interesting" in {    
     def required[T](s : String)(f : (String => Option[T])) = 
       f(s) toSuccess { List((s, "Required!")) }
       
@@ -24,8 +47,7 @@ object ValidationsAndForms extends Specification {
         case Right(v) => Success(v)
         case Left(e) => Failure(List((s, "must be integer")))
       }
-    }
-    
+    }    
     
     val name = required("name")(validData get _)   
     val emptyName = required("name")(emptyData get _)
@@ -43,7 +65,7 @@ object ValidationsAndForms extends Specification {
     intAge must be_==(Success(26))
     
     badAge must be_==(Failure(List(("age", "must be integer"))))
-    
+
 //    val f = Function.curried(Person.apply _).liftM[PartialApply1Of2[Validation,(String, String)]#Apply]
     
     val x = name liftA (intAge, Function.curried(Person.apply _))
